@@ -1,0 +1,14 @@
+[project]
+name = "kedra-scraper-challenge"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.28.1",
+    "scrapy>=2.13.3",
+    "python-dotenv>=1.0.0",
+    "boto3>=1.26.0",
+    "pymongo>=4.0.0",
+    "dotenv>=0.9.9",
+]
