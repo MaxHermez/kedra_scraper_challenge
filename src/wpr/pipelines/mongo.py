@@ -3,7 +3,7 @@ from pymongo import MongoClient
 
 class MongoPipeline:
     """
-    Inserts the (now lightweight) item into MongoDB.
+    Inserts the metadata item into MongoDB.
     """
     def __init__(self, uri, db_name, collection):
         self.uri         = uri
@@ -18,16 +18,14 @@ class MongoPipeline:
         return cls(
             s.get('MONGO_URI'),
             s.get('MONGO_DB'),
-            s.get('MONGO_COL'),
+            s.get('MONGO_LANDING_COL'),
         )
 
     def open_spider(self, spider):
         self.client = MongoClient(self.uri)
         self.col    = self.client[self.db_name][self.collection]
-        # Optional: create index on decision_id + partition_date, etc.
 
     def process_item(self, item, spider):
-        # PyMongo can take a Scrapy Item or dict directly
         self.col.update_one(
             {'decision_id': item['decision_id']},
             {'$setOnInsert': dict(item)},

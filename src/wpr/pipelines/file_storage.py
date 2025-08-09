@@ -1,10 +1,8 @@
-import logging
 import hashlib
-
 import boto3
+from time import time
 from scrapy.exceptions import DropItem
 
-log = logging.getLogger(__name__)
 
 class FileStoragePipeline:
     """
@@ -33,6 +31,7 @@ class FileStoragePipeline:
         )
 
     def open_spider(self, spider):
+        # Initialize the S3 client
         self.s3 = boto3.client(
             's3',
             endpoint_url=self.s3_endpoint,
@@ -43,7 +42,6 @@ class FileStoragePipeline:
         try:
             self.s3.head_bucket(Bucket=self.bucket)
         except:
-            # NOTE: This would change if using AWS S3 we would need to add LocationConstraint
             self.s3.create_bucket(Bucket=self.bucket)
 
     def process_item(self, item, spider):
@@ -51,17 +49,17 @@ class FileStoragePipeline:
         if blob is None:
             raise DropItem("Missing file_content")
         hashed = hashlib.sha256(
-                f"{item['file_url']}{item['partition_date']}".encode()
+                f"{item['file_source_url']}{item['partition_date']}{time()}".encode()
             ).hexdigest()
         key = (
             f"{self.base_prefix}"
             f"{item['partition_date']}/"
             f"{hashed}"
         )
-        
 
         self.s3.put_object(Bucket=self.bucket, Key=key, Body=blob)
-        item['file_path'] = f"s3://{self.bucket}/{key}"
+        item['file_bucket'] = self.bucket
+        item['file_key'] = key
 
         # Remove raw bytes so Mongo doesn’t store them
         item.pop('file_content', None)

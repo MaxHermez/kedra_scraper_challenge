@@ -1,107 +1,30 @@
-version: '3.7'
-
-services:
-  mongodb:
-    image: bitnami/mongodb
-    container_name: mongodb_dagster
-    restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: rootpassword   # change!
-    volumes:
-      - mongo_data:/data/db
-    ports:
-      - "27017:27017"
-    networks: [backend]
-
-  minio:
-    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
-    container_name: minio
-    command: server /data --console-address ":9001"
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: minioadmin          # change!
-      MINIO_ROOT_PASSWORD: minioadmin123   # change!
-    volumes:
-      - minio_data:/data
-    ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web console
-    networks: [backend]
-
-  docker_postgresql:
-    image: postgres:11
-    container_name: docker_postgresql
-    environment:
-      POSTGRES_USER: 'postgres_user'
-      POSTGRES_PASSWORD: 'postgres_password'
-      POSTGRES_DB: 'postgres_db'
-    networks:
-      - backend
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres_user -d postgres_db']
-      interval: 10s
-      timeout: 8s
-      retries: 5
-
-  dagster-webserver:
-    build:
-      context: ./dagster
-      dockerfile: ./Dockerfile
-    container_name: dagster-webserver
-    entrypoint:
-      - dagster-webserver
-      - -h
-      - '0.0.0.0'
-      - -p
-      - '3000'
-      - -w
-      - workspace.yaml
-    expose:
-      - '3000'
-    ports:
-      - '3000:3000'
-    environment:
-      DAGSTER_POSTGRES_USER: 'postgres_user'
-      DAGSTER_POSTGRES_PASSWORD: 'postgres_password'
-      DAGSTER_POSTGRES_DB: 'postgres_db'
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/io_manager_storage:/tmp/io_manager_storage
-      # - ./dagster:/opt/dagster/app          # your code repos / workspace.yaml live here
-      # - dagster_home:/opt/dagster/dagster_home
-    depends_on:
-      - docker_postgresql
-    networks:
-      - backend
-  dagster-daemon:
-    build:
-      context: ./dagster
-      dockerfile: ./Dockerfile
-    entrypoint:
-      - dagster-daemon
-      - run
-    container_name: dagster-daemon
-    restart: no
-    environment:
-      DAGSTER_POSTGRES_USER: 'postgres_user'
-      DAGSTER_POSTGRES_PASSWORD: 'postgres_password'
-      DAGSTER_POSTGRES_DB: 'postgres_db'
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/io_manager_storage:/tmp/io_manager_storage
-      # - ./dagster:/opt/dagster/app
-      # - dagster_home:/opt/dagster/dagster_home
-    networks:
-      - backend
-    depends_on:
-      - docker_postgresql
-
 networks:
   backend:
-    driver: bridge
+    external: true
+    name: backend
 
-volumes:
-  mongo_data:
-  minio_data:
-  dagster_home:
+services:
+  dagster_wpr:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile_wpr
+    image: wpr_image
+    container_name: dagster_wpr
+    # restart: unless-stopped
+    restart: no
+    environment:
+      DAGSTER_SQL_ALCHEMY_DB_URL: postgresql+psycopg2://$PG_USER:$PG_PASSWORD@dagster_postgres:5432/$PG_DB
+      MONGO_URI: mongodb://mongodb_dagster:27017/
+      MONGO_DB: $MONGO_DB
+      MONGO_LANDING_COL: $MONGO_LANDING_COL
+      MONGO_PROCESSED_COL: $MONGO_PROCESSED_COL
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: $MINIO_ACCESS_KEY
+      MINIO_SECRET_KEY: $MINIO_SECRET_KEY
+      LANDING_BUCKET: $LANDING_BUCKET
+      CLEAN_BUCKET: $CLEAN_BUCKET
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../dagster_home:/app/dagster_home
+    networks: [backend]
